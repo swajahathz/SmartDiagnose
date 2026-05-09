@@ -13,7 +13,6 @@
 @include('partials.monitor-nav', [
     'active' => 'dashboard',
     'pollLabel' => 'Poll: '.$pollSeconds.'s',
-    'authEnabled' => $authEnabled,
 ])
 
 <div class="container-fluid px-3 pb-5">

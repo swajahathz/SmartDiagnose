@@ -14,7 +14,6 @@ class SlowQueriesController extends Controller
         return view('slow-queries', [
             'pollMs' => $pollMs,
             'pollLabel' => sprintf('Refresh: %ss', $sec == (int) $sec ? (string) (int) $sec : sprintf('%.1f', $sec)),
-            'authEnabled' => filled(config('monitor.auth.user')) && config('monitor.auth.password') !== '',
         ]);
     }
 }

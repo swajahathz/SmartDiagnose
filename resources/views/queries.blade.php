@@ -10,7 +10,7 @@
     @include('partials.monitor-styles')
 </head>
 <body>
-@include('partials.monitor-nav', ['active' => 'queries', 'pollLabel' => $pollLabel, 'authEnabled' => $authEnabled])
+@include('partials.monitor-nav', ['active' => 'queries', 'pollLabel' => $pollLabel])
 
 <div class="container-fluid px-3 pb-5">
     <div id="banner-error" class="alert alert-danger d-none" role="alert"></div>

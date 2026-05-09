@@ -4,21 +4,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | HTTP Basic Auth (optional)
-    |--------------------------------------------------------------------------
-    |
-    | If both user and password are set, the dashboard and metrics API require
-    | Basic authentication. Leave empty for local-only / trusted networks.
-    |
-    */
-
-    'auth' => [
-        'user' => env('MONITOR_AUTH_USER'),
-        'password' => env('MONITOR_AUTH_PASSWORD'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | MySQL error log tail
     |--------------------------------------------------------------------------
     */
@@ -81,5 +66,23 @@ return [
     'iostat_interval' => max(1, min(60, (int) env('MONITOR_IOSTAT_INTERVAL', 1))),
 
     'iostat_binary' => env('MONITOR_IOSTAT_BINARY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | FreeRADIUS log tail (file on disk)
+    |--------------------------------------------------------------------------
+    |
+    | freeradius -X is foreground debug; logs must be written to a file this user
+    | can read (redirect, or log { } in FreeRADIUS config).
+    |
+    */
+
+    'freeradius_log_enabled' => filter_var(env('FREERADIUS_LOG_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+    'freeradius_log_path' => env('FREERADIUS_LOG_PATH'),
+
+    'freeradius_log_lines' => max(20, min(5000, (int) env('FREERADIUS_LOG_LINES', 300))),
+
+    'freeradius_poll_seconds' => max(2, (float) env('FREERADIUS_POLL_SECONDS', 3)),
 
 ];

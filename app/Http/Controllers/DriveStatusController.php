@@ -10,7 +10,6 @@ class DriveStatusController extends Controller
     {
         return view('drive-status', [
             'pollSeconds' => (float) config('monitor.disk_poll_seconds', 5),
-            'authEnabled' => filled(config('monitor.auth.user')) && config('monitor.auth.password') !== '',
         ]);
     }
 }

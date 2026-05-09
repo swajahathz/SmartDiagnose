@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -12,14 +13,36 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Set in .env (then run php artisan db:seed):
+     * SMARTDIAGNOSE_ADMIN_EMAIL=you@example.com
+     * SMARTDIAGNOSE_ADMIN_PASSWORD=your-secret
+     * SMARTDIAGNOSE_ADMIN_NAME="Your Name"   (optional)
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $email = env('SMARTDIAGNOSE_ADMIN_EMAIL');
+        $password = env('SMARTDIAGNOSE_ADMIN_PASSWORD');
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if (! is_string($email) || $email === '' || ! is_string($password) || $password === '') {
+            if ($this->command) {
+                $this->command->warn('Skipping user: add SMARTDIAGNOSE_ADMIN_EMAIL and SMARTDIAGNOSE_ADMIN_PASSWORD to .env');
+            }
+
+            return;
+        }
+
+        User::query()->updateOrCreate(
+            ['email' => $email],
+            [
+                'name' => env('SMARTDIAGNOSE_ADMIN_NAME', 'Administrator'),
+                'password' => Hash::make($password),
+                'email_verified_at' => now(),
+            ],
+        );
+
+        if ($this->command) {
+            $this->command->info('Admin user ready: '.$email);
+        }
     }
 }

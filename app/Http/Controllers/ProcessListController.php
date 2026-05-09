@@ -14,7 +14,6 @@ class ProcessListController extends Controller
         return view('queries', [
             'pollMs' => $pollMs,
             'pollLabel' => sprintf('Refresh: %ss', $pollSec == (int) $pollSec ? (string) (int) $pollSec : sprintf('%.1f', $pollSec)),
-            'authEnabled' => filled(config('monitor.auth.user')) && config('monitor.auth.password') !== '',
         ]);
     }
 }

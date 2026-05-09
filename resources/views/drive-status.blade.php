@@ -13,7 +13,6 @@
 @include('partials.monitor-nav', [
     'active' => 'drives',
     'pollLabel' => 'Poll: '.$pollSeconds.'s (iostat ~'.(int) config('monitor.iostat_interval', 1).'s/sample)',
-    'authEnabled' => $authEnabled,
 ])
 
 <div class="container-fluid px-3 pb-5">
