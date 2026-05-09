@@ -18,23 +18,6 @@
 <div class="container-fluid px-3 pb-5">
     <div id="banner-error" class="alert alert-danger d-none" role="alert"></div>
 
-    <div class="alert alert-secondary border-secondary mb-2 py-2 small">
-        <strong>This app does not start or stop FreeRADIUS.</strong> It only <strong>reads</strong> the file path in
-        <code>FREERADIUS_LOG_PATH</code>. You do <strong>not</strong> need to stop the service for SmartDiagnose to work.
-    </div>
-    <div class="alert alert-secondary border-secondary mb-3 py-2 small mb-0">
-        <strong>Why people stop the service:</strong> <code>freeradius -X</code> is foreground debug. If the normal daemon is already
-        running (systemd), ports may be in use — many admins run <code>systemctl stop freeradius</code> first, then <code>freeradius -X</code>.
-        That is only for manual debugging on the server, not required here.
-        <strong>For 24/7 logs</strong>, keep the service running and point <code>FREERADIUS_LOG_PATH</code> at the file your
-        <em>running</em> server writes (via <code>log { }</code> in config), not only a one-off <code>-X</code> redirect.
-    </div>
-    <div class="alert alert-secondary border-secondary mb-3 py-2 small mb-0">
-        <strong>Setup:</strong> <code>freeradius -X</code> prints to the terminal unless redirected. Example:
-        <code>freeradius -X &gt;&gt; /var/log/freeradius/debug.log 2&gt;&amp;1</code> — or configure
-        <code>log { ... }</code> under <code>/etc/freeradius/</code>. Ensure the web user can read that file.
-    </div>
-
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span>FreeRADIUS log tail</span>

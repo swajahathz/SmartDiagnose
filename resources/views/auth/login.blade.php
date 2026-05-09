@@ -43,11 +43,6 @@
             </form>
         </div>
     </div>
-    <p class="text-secondary small text-center mt-3 mb-0">
-        First time? Set <code class="user-select-all">SMARTDIAGNOSE_ADMIN_EMAIL</code> and
-        <code class="user-select-all">SMARTDIAGNOSE_ADMIN_PASSWORD</code> in <code>.env</code>, run
-        <code>php artisan migrate</code> and <code>php artisan db:seed</code>.
-    </p>
 </div>
 </body>
 </html>
