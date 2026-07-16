@@ -7,8 +7,12 @@ use Symfony\Component\Process\Process;
 
 class IostatService
 {
+    public function __construct(
+        private readonly ProcessIoService $processIo,
+    ) {}
+
     /**
-     * Runs `iostat -y -x {interval} 1`: one interval sample, skipping boot averages (-y).
+     * Runs `iostat -y -x {interval} 1` in parallel with `pidstat -d {interval} 1`.
      *
      * @return array<string, mixed>
      */
@@ -16,6 +20,7 @@ class IostatService
     {
         $started = microtime(true);
         $interval = max(1, min(60, (int) config('monitor.iostat_interval', 1)));
+        $processLimit = max(5, min(40, (int) config('monitor.process_io_limit', 15)));
 
         $binaryConfig = config('monitor.iostat_binary');
         $binary = is_string($binaryConfig) && $binaryConfig !== '' ? $binaryConfig : null;
@@ -29,25 +34,30 @@ class IostatService
 
         $process = new Process([$binary, '-y', '-x', (string) $interval, '1']);
         $process->setTimeout($interval + 8);
-        $process->run();
+
+        // Sample per-process IO in the same wall-clock window as iostat.
+        $pidstatProc = $this->processIo->startSampleProcess($interval);
+        $process->start();
+        $process->wait();
+        $processIo = $this->processIo->finishSampleProcess($pidstatProc, $interval, $processLimit);
 
         $elapsedMs = (int) round((microtime(true) - $started) * 1000);
 
         if (! $process->isSuccessful()) {
             $hint = trim($process->getErrorOutput()) ?: trim($process->getOutput());
 
-            return $this->failure($started, $hint !== '' ? $hint : 'iostat exited with code '.$process->getExitCode());
+            return $this->failure($started, $hint !== '' ? $hint : 'iostat exited with code '.$process->getExitCode(), $processIo);
         }
 
         $stdout = trim($process->getOutput());
         if ($stdout === '') {
-            return $this->failure($started, 'Empty iostat output.');
+            return $this->failure($started, 'Empty iostat output.', $processIo);
         }
 
         try {
             $parsed = $this->parseOutput($stdout);
         } catch (\Throwable $e) {
-            return $this->failure($started, 'Parse error: '.$e->getMessage());
+            return $this->failure($started, 'Parse error: '.$e->getMessage(), $processIo);
         }
 
         $significantDevices = [];
@@ -74,6 +84,18 @@ class IostatService
         $ioWait = isset($parsed['cpu']['iowait']) ? (float) $parsed['cpu']['iowait'] : null;
 
         $level = $this->rollupLevel($maxUtil ?? 0.0, $ioWait ?? 0.0, count($peakSubset));
+        $topProcess = $processIo['processes'][0] ?? null;
+
+        $detail = $this->rollupDetail($level, $maxDevice, $maxUtil, $meanUtil, $ioWait, count($parsed['devices']));
+        if (is_array($topProcess) && (($topProcess['total_kB_per_s'] ?? 0) > 0)) {
+            $detail .= sprintf(
+                ' Top IO: %s (PID %d) R %.0f / W %.0f kB/s.',
+                $topProcess['service'] ?? $topProcess['command'] ?? 'process',
+                (int) ($topProcess['pid'] ?? 0),
+                (float) ($topProcess['kB_rd_per_s'] ?? 0),
+                (float) ($topProcess['kB_wr_per_s'] ?? 0),
+            );
+        }
 
         return [
             'ok' => true,
@@ -84,16 +106,24 @@ class IostatService
             'binary' => $binary,
             'cpu' => $parsed['cpu'],
             'devices' => $significantDevices,
+            'processes' => $processIo['processes'],
+            'process_io' => [
+                'ok' => $processIo['ok'],
+                'command' => $processIo['command'],
+                'error' => $processIo['error'],
+            ],
             'summary' => [
                 'level' => $level,
                 'headline' => $this->rollupHeadline($level, $maxUtil, $ioWait),
-                'detail' => $this->rollupDetail($level, $maxDevice, $maxUtil, $meanUtil, $ioWait, count($parsed['devices'])),
+                'detail' => $detail,
                 'max_util_percent' => $maxUtil,
                 'max_util_device' => $maxDevice,
                 'mean_util_percent' => $meanUtil !== null ? round($meanUtil, 1) : null,
                 'iowait_percent' => $ioWait,
                 'device_count_reported' => count($parsed['devices']),
                 'device_count_peak' => count($peakSubset),
+                'top_io_service' => is_array($topProcess) ? ($topProcess['service'] ?? null) : null,
+                'top_io_pid' => is_array($topProcess) ? ($topProcess['pid'] ?? null) : null,
             ],
         ];
     }
@@ -314,11 +344,13 @@ class IostatService
     }
 
     /**
+     * @param  array{ok?: bool, command?: string|null, processes?: list<array<string, mixed>>, error?: string|null}|null  $processIo
      * @return array<string, mixed>
      */
-    private function failure(float $started, string $msg): array
+    private function failure(float $started, string $msg, ?array $processIo = null): array
     {
         $elapsedMs = (int) round((microtime(true) - $started) * 1000);
+        $processIo ??= ['ok' => false, 'command' => null, 'processes' => [], 'error' => null];
 
         return [
             'ok' => false,
@@ -328,6 +360,12 @@ class IostatService
             'error' => $msg,
             'cpu' => null,
             'devices' => [],
+            'processes' => $processIo['processes'] ?? [],
+            'process_io' => [
+                'ok' => $processIo['ok'] ?? false,
+                'command' => $processIo['command'] ?? null,
+                'error' => $processIo['error'] ?? null,
+            ],
             'summary' => [
                 'level' => 'unknown',
                 'headline' => 'Disk metrics unavailable',
@@ -338,6 +376,8 @@ class IostatService
                 'iowait_percent' => null,
                 'device_count_reported' => 0,
                 'device_count_peak' => 0,
+                'top_io_service' => null,
+                'top_io_pid' => null,
             ],
         ];
     }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DriveServiceDetailController;
 use App\Http\Controllers\DriveStatusController;
 use App\Http\Controllers\DriveStatusMetricsController;
 use App\Http\Controllers\FreeradiusLogController;
@@ -32,9 +33,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/processlist', ProcessListJsonController::class)->name('api.processlist');
         Route::get('/api/slow-queries', SlowQueriesJsonController::class)->name('api.slow-queries');
         Route::get('/api/freeradius-log', FreeradiusLogJsonController::class)->name('api.freeradius-log');
+        Route::get('/api/drive-service-detail', DriveServiceDetailController::class)->name('api.drive-service-detail');
     });
 
-    Route::middleware('throttle:40,1')->group(function () {
+    Route::middleware('throttle:120,1')->group(function () {
         Route::get('/api/drive-status', DriveStatusMetricsController::class)->name('api.drive-status');
     });
 });

@@ -61,11 +61,23 @@ return [
     |
     */
 
-    'disk_poll_seconds' => max(3, (float) env('MONITOR_DISK_POLL_SECONDS', 5)),
+    'disk_poll_seconds' => max(1, (float) env('MONITOR_DISK_POLL_SECONDS', 1)),
 
     'iostat_interval' => max(1, min(60, (int) env('MONITOR_IOSTAT_INTERVAL', 1))),
 
     'iostat_binary' => env('MONITOR_IOSTAT_BINARY'),
+
+    /*
+    | Per-process disk IO via `pidstat -d` (sampled in parallel with iostat).
+    | Non-root PHP-FPM needs the diagnose-pidstat sudo wrapper to see other users' IO.
+    */
+    'pidstat_binary' => env('MONITOR_PIDSTAT_BINARY'),
+
+    'pidstat_sudo_wrapper' => env('MONITOR_PIDSTAT_SUDO_WRAPPER', '/usr/local/sbin/diagnose-pidstat'),
+
+    'sudo_binary' => env('MONITOR_SUDO_BINARY'),
+
+    'process_io_limit' => max(5, min(40, (int) env('MONITOR_PROCESS_IO_LIMIT', 15))),
 
     /*
     |--------------------------------------------------------------------------

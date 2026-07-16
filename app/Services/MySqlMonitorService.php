@@ -169,6 +169,134 @@ class MySqlMonitorService
     }
 
     /**
+     * Drive-status click detail: live queries / digests for MySQL IO culprits.
+     *
+     * @return array{ok: bool, kind: string, error?: string, summary?: array<string, mixed>, queries?: list<array<string, mixed>>, current_statements?: list<array<string, mixed>>, digests?: list<array<string, mixed>>}
+     */
+    public function fetchMysqlIoDetail(): array
+    {
+        try {
+            DB::connection('monitor')->getPdo();
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'kind' => 'mysql', 'error' => $e->getMessage()];
+        }
+
+        try {
+            $longSec = (float) config('monitor.long_query_seconds', 3);
+            $raw = DB::connection('monitor')->select('SHOW FULL PROCESSLIST');
+
+            $all = [];
+            $sleep = 0;
+            $other = 0;
+            foreach ($raw as $row) {
+                $r = array_change_key_case((array) $row, CASE_LOWER);
+                $time = isset($r['time']) ? (float) $r['time'] : 0.0;
+                $cmd = strtoupper((string) ($r['command'] ?? ''));
+                $info = isset($r['info']) ? $this->truncate((string) $r['info'], 4000) : null;
+
+                if ($cmd === 'SLEEP') {
+                    $sleep++;
+
+                    continue;
+                }
+
+                $isQuery = in_array($cmd, ['QUERY', 'EXECUTE'], true) && is_string($info) && $info !== '';
+                if (! $isQuery) {
+                    $other++;
+                }
+
+                $all[] = [
+                    'Id' => $r['id'] ?? null,
+                    'User' => $r['user'] ?? null,
+                    'Host' => $r['host'] ?? null,
+                    'db' => $r['db'] ?? null,
+                    'Command' => $r['command'] ?? null,
+                    'Time' => $time,
+                    'State' => $r['state'] ?? null,
+                    'Info' => $info,
+                    'long_running' => $time >= $longSec,
+                    'is_query' => $isQuery,
+                ];
+            }
+
+            $queries = array_values(array_filter($all, static fn (array $r) => ($r['is_query'] ?? false) === true));
+            usort($queries, static fn ($a, $b) => ($b['Time'] <=> $a['Time']));
+            $queries = array_slice($queries, 0, 40);
+
+            // Non-query busy threads (e.g. Binlog Dump) still useful context.
+            $busy = array_values(array_filter($all, static fn (array $r) => ($r['is_query'] ?? false) !== true));
+            usort($busy, static fn ($a, $b) => ($b['Time'] <=> $a['Time']));
+            $busy = array_slice($busy, 0, 15);
+
+            return [
+                'ok' => true,
+                'kind' => 'mysql',
+                'summary' => [
+                    'threads_total' => count($raw),
+                    'queries_active' => count($queries),
+                    'sleeping' => $sleep,
+                    'other_busy' => count($busy),
+                    'hint' => count($queries) === 0
+                        ? 'No active SQL text right now—IO may be InnoDB flush / commit / background writers. Check top digests below (cumulative).'
+                        : 'Active queries below are the current SQL using this MySQL process.',
+                ],
+                'queries' => $queries,
+                'other_threads' => $busy,
+                'current_statements' => $this->currentStatements(25),
+                'digests' => $this->slowStatementDigests(15),
+            ];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'kind' => 'mysql', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function currentStatements(int $limit): array
+    {
+        $limit = max(5, min(50, $limit));
+
+        try {
+            $sql = <<<SQL
+SELECT
+  THREAD_ID AS thread_id,
+  CURRENT_SCHEMA AS current_schema,
+  SQL_TEXT AS sql_text,
+  TIMER_WAIT AS timer_wait,
+  ROWS_EXAMINED AS rows_examined,
+  ROWS_AFFECTED AS rows_affected,
+  LOCK_TIME AS lock_time
+FROM performance_schema.events_statements_current
+WHERE SQL_TEXT IS NOT NULL AND SQL_TEXT != ''
+ORDER BY TIMER_WAIT DESC
+LIMIT {$limit}
+SQL;
+            $rows = DB::connection('monitor')->select($sql);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            $a = (array) $row;
+            $waitPs = isset($a['timer_wait']) ? (float) $a['timer_wait'] : 0.0;
+            $lockPs = isset($a['lock_time']) ? (float) $a['lock_time'] : 0.0;
+            $out[] = [
+                'thread_id' => $a['thread_id'] ?? null,
+                'schema' => $a['current_schema'] ?? null,
+                'sql_text' => isset($a['sql_text']) ? $this->truncate((string) $a['sql_text'], 4000) : '',
+                'seconds' => round($waitPs / 1e12, 4),
+                'lock_seconds' => round($lockPs / 1e12, 4),
+                'rows_examined' => (int) ($a['rows_examined'] ?? 0),
+                'rows_affected' => (int) ($a['rows_affected'] ?? 0),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * @return array{ok: bool, rows: list<array<string, mixed>>, error?: string}
      */
     public function fetchProcessListForApi(): array

@@ -248,4 +248,38 @@
         color: #6e7681 !important;
         font-size: .62rem;
     }
+    .disk-io-bar {
+        display: inline-block;
+        width: 52px;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(110, 118, 129, .25);
+        overflow: hidden;
+        vertical-align: middle;
+        flex-shrink: 0;
+    }
+    .disk-io-bar > span {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #58a6ff, #f85149);
+        border-radius: 3px;
+    }
+    .disk-svc-row { cursor: pointer; }
+    .disk-svc-row:hover > td { background: rgba(88, 166, 255, .08); }
+    .disk-svc-selected > td { outline: 1px solid rgba(88, 166, 255, .45); }
+    .disk-log-pre {
+        max-height: 50vh;
+        overflow: auto;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: .4rem;
+        padding: .75rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    #svc-detail .sql-wrap {
+        max-width: 380px;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 </style>
